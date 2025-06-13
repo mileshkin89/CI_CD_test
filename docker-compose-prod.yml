@@ -4,8 +4,8 @@
 services:
   bot:
     restart: always
-    build: .
-    container_name: oi-screener
+    image: mileshkin89/ci_cd_test:latest
+    container_name: ci_cd_test
     command: [ "python", "main.py" ]
     env_file:
       - .env
