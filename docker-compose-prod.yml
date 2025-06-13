@@ -1,0 +1,29 @@
+# docker-compose -f docker-compose-prod.yml up --build
+# docker-compose -f docker-compose-prod.yml down
+# docker-compose -f docker-compose-prod.yml up
+services:
+  bot:
+    restart: always
+    build: .
+    container_name: oi-screener
+    command: [ "python", "main.py" ]
+    env_file:
+      - .env
+    environment:
+      - LOG_LEVEL=debug
+      - PYTHONPATH=/usr
+    volumes:
+      - storage_data:/usr/src/storage
+      - logs_data:/usr/src/logs
+    networks:
+      - bot_network
+
+volumes:
+  storage_data:
+    driver: local
+  logs_data:
+    driver: local
+
+networks:
+  bot_network:
+    driver: bridge
