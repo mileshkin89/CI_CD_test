@@ -16,18 +16,26 @@ jobs:
     - name: Set up SSH key
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-        # Проверка
-        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'Connected!'"
+        # Проверка подключения
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
 
     - name: Deploy to EC2
       run: |
-        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          set -e  # Выход при ошибке
           cd /home/ubuntu/src/CI_CD_test/
-          git pull origin main
-          docker compose down
+          
+          # Сброс всех локальных изменений
+          git reset --hard HEAD
+          git clean -fd
+          
+          # Принудительный pull (с перезаписью)
+          git pull origin main --force
+          
+          # Пересборка контейнеров
+          docker compose down --remove-orphans || true
           docker compose up -d --build
         EOF
-        
