@@ -15,7 +15,7 @@ jobs:
 
     - name: Set up SSH key
       run: |
-        mkdir -p ~/.ssh
+        mkdir -p ~/home/ubuntu/.ssh
         echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
@@ -23,7 +23,7 @@ jobs:
     - name: Deploy to EC2
       run: |
         ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd /home/ubuntu/src/ci_cd_test_bot/
+          cd /home/ubuntu/src/CI_CD_test/
           git pull origin main
           docker compose down
           docker compose up -d --build
