@@ -35,7 +35,7 @@ jobs:
           # Принудительный pull (с перезаписью)
           git pull origin main --force
           
-          # Пересборка контейнеров
-          docker compose down --remove-orphans || true
-          docker compose up -d --build
+          # Пересборка контейнеров с явным указанием файла
+          docker compose -f docker-compose-prod.yml down --remove-orphans || true
+          docker compose -f docker-compose-prod.yml up -d --build
         EOF
