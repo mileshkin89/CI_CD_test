@@ -29,4 +29,6 @@ WORKDIR /usr/src
 # Copy source code into the container
 COPY ./src .
 
-CMD ["python", "main.py"]
+#ENV PYTHONPATH=/usr/src
+#
+#CMD ["python", "main.py"]

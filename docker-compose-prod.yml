@@ -4,7 +4,7 @@
 services:
   bot:
     restart: always
-    image: mileshkin89/ci_cd_test:latest
+    image: mileshkin89/ci_cd_test:compose_start
     container_name: ci_cd_test
     command: [ "python", "main.py" ]
     env_file:
@@ -13,17 +13,14 @@ services:
       - LOG_LEVEL=debug
       - PYTHONPATH=/usr
     volumes:
-      - storage_data:/usr/src/storage
-      - logs_data:/usr/src/logs
+      - logs_data:/usr/src/ci_cd_logs
     networks:
-      - bot_network
+      - test_net
 
 volumes:
-  storage_data:
-    driver: local
   logs_data:
     driver: local
 
 networks:
-  bot_network:
+  test_net:
     driver: bridge
