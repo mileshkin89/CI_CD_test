@@ -1,8 +1,8 @@
-name: Build-Test-Push and Deploy
+name: Build-Push-Deploy
 
 on:
   workflow_run:
-    workflows: [ "python-app.yml" ]
+    workflows: [ "Python application" ]
     types:
       - completed
     branches: [ "main" ]
