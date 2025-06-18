@@ -1,9 +1,10 @@
 name: Build-Test-Push and Deploy
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
+  workflow_run:
+    workflows: [ "python-app.yml" ]
+    types:
+      - completed
     branches: [ "main" ]
 
 env:
