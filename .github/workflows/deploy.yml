@@ -66,12 +66,15 @@ jobs:
           set -e
 
           IMAGE_TAG="${{ env.IMAGE_TAG }}"
-
-          echo "🧹 Stopping existing container..."
-          docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml down --remove-orphans || true
+        
+          echo "image: test" | sed "s|image: .*|image: mileshkin89/ci_cd_test:20250618104143|"
+          cat /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml
 
           echo "📦 Updating image in docker-compose-prod.yml..."
           sed -i "s|image: .*|image: $IMAGE_TAG|" /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml
+        
+          echo "🧹 Stopping existing container..."
+          docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml down --remove-orphans || true
 
           echo "📥 Pulling updated image..."
           docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml pull
@@ -79,3 +82,4 @@ jobs:
           echo "🚀 Starting updated container..."
           docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml up -d
         EOF
+    
