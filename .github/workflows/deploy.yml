@@ -8,7 +8,9 @@ on:
 
 env:
   IMAGE_NAME: ci_cd_test
-  DOCKERHUB_USER: mileshkin89
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  TAG: ci_cd_test:${{ steps.timestamp.outputs.tag }}
 
 jobs:
   build_test_push:
