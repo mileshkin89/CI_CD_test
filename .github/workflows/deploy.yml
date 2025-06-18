@@ -1,119 +1,53 @@
-# deploy.yml
-name: Deploy to EC2 via SSH
+name: Build-Test-Push and Deploy
 
 on:
-  workflow_run:
-    workflows: ["Python application"]
-    types:
-      - completed
+  push:
+    branches: [ "main" ]
+  pull_request:
     branches: [ "main" ]
 
+env:
+  IMAGE_NAME: ci_cd_test
+  DOCKERHUB_USER: mileshkin89
+
 jobs:
-  build-image:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    # if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
-    name: Build Docker Image
+  build_test_push:
+    name: Build, Test and Push Docker Image
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: Checkout repo
       uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: Set dynamic tag (timestamp)
+      id: set_tag
+      run: echo "TAG=${{ env.IMAGE_NAME }}:$(date +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
 
     - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Generate image tag
-      id: vars
-      run: echo "tag=$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+      run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
     - name: Build Docker image
+      run: docker build -t $DOCKERHUB_USER/$TAG .
+
+    - name: Test Docker container
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/ci_cd_test:${{ steps.vars.outputs.tag }} .
+        docker run -d --rm --name test_container $DOCKERHUB_USER/$TAG
+        sleep 5  # подождать немного, если есть init-логика
+        docker logs test_container
+        docker stop test_container
 
-    - name: Save tag to artifact
-      run: echo "${{ steps.vars.outputs.tag }}" > image_tag.txt
+    - name: Push image to DockerHub
+      run: docker push $DOCKERHUB_USER/$TAG
 
-    - name: Upload tag artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: image_tag
-        path: image_tag.txt
-
-  test-container:
-    name: Test Docker Container
-    needs: build-image
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download tag artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: image_tag
-
-    - name: Read tag
-      id: vars
-      run: echo "tag=$(cat image_tag.txt)" >> $GITHUB_OUTPUT
-
-    - name: Run container
-      run: |
-        docker run -d --rm --name test_container ${{ secrets.DOCKER_USERNAME }}/ci_cd_test:${{ steps.vars.outputs.tag }}
-
-    - name: Wait and test container
-      run: |
-        sleep 5
-        docker ps | grep test_container
-
-    - name: Stop and remove container
-      run: docker stop test_container || true
-
-  push-image:
-    name: Push Docker Image to Hub
-    needs: test-container
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download tag artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: image_tag
-
-    - name: Read tag
-      id: vars
-      run: echo "tag=$(cat image_tag.txt)" >> $GITHUB_OUTPUT
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Push image
-      run: docker push ${{ secrets.DOCKER_USERNAME }}/ci_cd_test:${{ steps.vars.outputs.tag }}
+    - name: Export image tag
+      run: echo "IMAGE_TAG=$DOCKERHUB_USER/$TAG" >> $GITHUB_ENV
 
   deploy:
     name: Deploy to EC2
-    needs: push-image
+    needs: build_test_push
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download tag artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: image_tag
-
-    - name: Read tag
-      id: vars
-      run: echo "tag=$(cat image_tag.txt)" >> $GITHUB_OUTPUT
-
     - name: Set up SSH key
       run: |
         mkdir -p ~/.ssh
@@ -125,62 +59,16 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
           set -e
-          echo "📁 Перехожу в директорию проекта..."
-          cd /home/ubuntu/src/CI_CD_test/
 
-          echo "⛔ Останавливаю текущий контейнер..."
-          docker compose -f docker-compose-prod.yml down --remove-orphans || true
+          echo "🧹 Stopping existing container..."
+          docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml down --remove-orphans || true
 
-          echo "✍️ Обновляю тег образа в docker-compose-prod.yml..."
-          sed -i 's|image: .*$|image: ${{ secrets.DOCKER_USERNAME }}/ci_cd_test:${{ steps.vars.outputs.tag }}|' docker-compose-prod.yml
+          echo "📦 Updating image in docker-compose-prod.yml..."
+          sed -i 's|image: .*$|image: ${{ env.IMAGE_TAG }}|' /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml
 
-          echo "📦 Загружаю образ..."
-          docker compose -f docker-compose-prod.yml pull
+          echo "📥 Pulling updated image..."
+          docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml pull
 
-          echo "🚀 Запускаю контейнер..."
-          docker compose -f docker-compose-prod.yml up -d
+          echo "🚀 Starting updated container..."
+          docker compose -f /home/ubuntu/src/CI_CD_test/docker-compose-prod.yml up -d
         EOF
-
-
-
-
-#name: Deploy to EC2 via SSH
-#
-#on:
-#  push:
-#    branches: [ "main" ]
-#  pull_request:
-#    branches: [ "main" ]
-#
-#jobs:
-#  deploy:
-#    name: Deploy via SSH
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#    - name: Checkout code
-#      uses: actions/checkout@v4
-#
-#    - name: Set up SSH key
-#      run: |
-#        mkdir -p ~/.ssh
-#        echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
-#        chmod 600 ~/.ssh/id_rsa
-#        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-#
-#    - name: Deploy to EC2
-#      run: |
-#        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-#          set -e
-#          echo "📁 Перехожу в директорию проекта..."
-#          cd /home/ubuntu/src/CI_CD_test/
-#
-#          echo "⛔ Останавливаю текущий контейнер..."
-#          docker compose -f docker-compose-prod.yml down --remove-orphans || true
-#
-#          echo "📦 Загружаю новый образ из Docker Hub..."
-#          docker compose -f docker-compose-prod.yml pull
-#
-#          echo "🚀 Запускаю обновлённый контейнер..."
-#          docker compose -f docker-compose-prod.yml up -d
-#        EOF
