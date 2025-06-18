@@ -31,12 +31,15 @@ jobs:
     - name: Build Docker image
       run: docker build -t $DOCKERHUB_USER/$TAG .
 
-    - name: Test Docker container
-      run: |
-        docker run -d --rm --name test_container $DOCKERHUB_USER/$TAG
-        sleep 2
-        docker logs test_container
-        docker stop test_container
+    - name: Test Docker image
+      run: docker run --rm $DOCKERHUB_USER/$TAG
+
+#    - name: Test Docker container
+#      run: |
+#        docker run -d --rm --name test_container $DOCKERHUB_USER/$TAG
+#        sleep 2
+#        docker logs test_container
+#        docker stop test_container
 
     - name: Push image to DockerHub
       run: docker push $DOCKERHUB_USER/$TAG
